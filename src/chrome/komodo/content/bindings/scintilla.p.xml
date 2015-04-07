@@ -59,13 +59,12 @@
                     <xul:column/>
                 </xul:columns>
                 <xul:rows>
-                    <xul:row flex="1">
+                    <xul:row anonid="scimoz_row" flex="1">
                         <html:embed type="application/x-scimoz-plugin"
                                     anonid="scimoz"
                                     style="-moz-box-flex: 1;"
                                     pluginAllowsFocusEvents="false"
                                     pluginHandlesDomEvents="false"
-                                    xbl:inherits="pluginPaintHack"
                                     />
                         <xul:scrollbar orient="vertical" anonid="scrollbar_v" 
                                        can-scroll="false" for="scintilla"/>
@@ -181,7 +180,6 @@
             <![CDATA[
                 horizScrollPageIncrement = horizScrollPageIncrement || this.boxObject.width;
                 
-                const ISciMoz = Components.interfaces.ISciMoz;
                 const scimoz = this.scimoz;
                 
                 let scrollbar = this._scrollEventHandler.horizontal;
@@ -217,24 +215,37 @@
             <method name="updateScrollbarV">
             <body>
             <![CDATA[
-                const ISciMoz = Components.interfaces.ISciMoz;
-                const scimoz = this.scimoz;
-                
-                if (scimoz.lineCount < scimoz.firstVisibleLine) {
+                var scrollbar = this._scrollEventHandler.vertical;
+                if (scrollbar.suppress) {
                     return;
                 }
-                
-                var scrollbar = this._scrollEventHandler.vertical;
-                var lineCount = scimoz.visibleFromDocLine(scimoz.lineCount);
-                if (!scrollbar.suppress) {
-                    scrollbar.setAttribute("curpos", scimoz.firstVisibleLine);
-                    scrollbar.setAttribute("pageincrement", scimoz.linesOnScreen);
-                                         
-                    var canScroll = scimoz.linesOnScreen < lineCount;
-                    var maxpos = lineCount - scimoz.linesOnScreen;
-                    scrollbar.setAttribute("maxpos", maxpos < 0 ? 0 : maxpos);
-                    scrollbar.setAttribute("can-scroll", canScroll);
+
+                const scimoz = this.scimoz;
+                var lineCount = scimoz.lineCount;
+                var firstVisibleLine = scimoz.firstVisibleLine;
+                if (lineCount < firstVisibleLine) {
+                    return;
                 }
+
+                // Update the xul scrollbar attributes.
+
+                // When not called through the mutation observer (i.e. supress
+                // is true), then the mutation observer must supress the next
+                // event it receives, otherwise the scrollbar will jump
+                // needlessly - bug 106383.
+                if (!scrollbar.suppress) {
+                    scrollbar.suppressNext = true;
+                }
+
+                var linesOnScreen = scimoz.linesOnScreen;
+                var visLineCount = scimoz.visibleFromDocLine(lineCount);
+                scrollbar.setAttribute("curpos", firstVisibleLine);
+                scrollbar.setAttribute("pageincrement", linesOnScreen);
+                                     
+                var canScroll = linesOnScreen < visLineCount;
+                var maxpos = visLineCount - linesOnScreen;
+                scrollbar.setAttribute("maxpos", maxpos < 0 ? 0 : maxpos);
+                scrollbar.setAttribute("can-scroll", canScroll);
             ]]>
             </body>
             </method>
@@ -498,6 +509,11 @@
                         ob.horizontal.observe(this._scrollEventHandler.horizontal,
                                               {attributes: true, attributeFilter: ["curpos"]});
                         ob.vertical = new MutationObserver(mutations => {
+                            // Check if it needs to supress this mutation event.
+                            if (this._scrollEventHandler.vertical.suppressNext) {
+                                this._scrollEventHandler.vertical.suppressNext = false;
+                                return;
+                            }
                             this._scrollEventHandler.vertical.suppress = true;
                             try {
                                 this.scimoz.firstVisibleLine =
@@ -564,6 +580,22 @@
                 // control, you can do all this yourself!
                 var scimoz = this.scimoz;
                 try {
+
+/* #if PLATFORM == "darwin" */
+/**
+ * Hack for Mac OS X - when scintilla widgets are shown on the Mac, they
+ * sometimes flash (appear, disappear and then reappear) when they are first
+ * loaded. To workaround the flash, we start with the scintilla widget hidden,
+ * then it's made visible through a short setTimeout, so it looks as though the
+ * text is loaded smoothly (albeit with a very small delay).
+ */ 
+                    var scimoz_row = document.getAnonymousElementByAttribute(this, "anonid", "scimoz_row");
+                    scimoz_row.setAttribute("collapsed", "true");
+                    setTimeout(function() {
+                        scimoz_row.removeAttribute("collapsed");
+                    }, 10);
+/* #endif */
+
                     var controller = Cc['@ActiveState.com/scintilla/controller;1'].
                         createInstance(Ci.ISciMozController);
                     controller.init( scimoz );
@@ -671,6 +703,13 @@
                                                                this.pref_topics.length,
                                                                this.pref_topics,
                                                                false);
+
+                // Check if the view's scintilla widget requires the plugin paint hack.
+                let view = document.getBindingParent(this);
+                if (view.localName == "view" && view.scintilla.hasAttribute("pluginPaintHack")) {
+                    this.scimoz.enablePluginVisibilityHack();
+                }
+
                 scimoz.visible = true;
             } catch (e) {
                 this.log.exception(e);
@@ -1221,7 +1260,8 @@
                     case event.DOM_VK_RETURN:
                         break;
                     case event.DOM_VK_TAB:
-                        if (!ko.tabstops.textHasTabstops(scimoz.text)
+                        if ((!("tabstops" in ko)
+                                || !ko.tabstops.textHasTabstops(scimoz.text))
                             && (scimoz.selectionIsRectangle
                                 || scimoz.multipleSelection))
                         {

@@ -144,12 +144,12 @@ $cons->InstallXpcomComponent('scimoz_wrapper.js',
 # build and install the Mozilla plugin
 my $pluginName;
 my $xScintillaBuildDir = DirPath($scintillaBuildDir);
+my $LDFLAGS = $consLocal{'LDFLAGS'};
 
 if ($platform eq "win") {
     $pluginName = 'npscimoz.dll';
 
     %consLocal = $cons->copy();
-    my $LDFLAGS = $consLocal{'LDFLAGS'};
 
     $LDFLAGS .= " /dll kernel32.lib user32.lib gdi32.lib shell32.lib advapi32.lib xpcomglue_s.lib xul.lib nspr4.lib mozalloc.lib";
     foreach my $libDir (split(';', $mozLibPath)) {
@@ -222,7 +222,7 @@ elsif ($platform eq "darwin") {
 
     %consLocal = $cons->copy();
     $consLocal{'LIBS'} = "$xScintillaBuildDir/bin/scintilla.a";
-	$consLocal{'LIBS'} .= " $xScintillaBuildDir/cocoa/libpcre.a";
+    $consLocal{'LIBS'} .= " $xScintillaBuildDir/cocoa/libpcre.a";
     $consLocal{'LIBS'} .= " -Wl,-dead_strip -L$mozDevelDist/bin ";
 #    $consLocal{'LIBS'} .= " -Wl,-executable_path,$mozDevelDist/bin ";
     $consLocal{'LIBS'} .= " -Wl,-executable_path,$mozBin";
@@ -260,7 +260,7 @@ elsif ($platform eq "darwin") {
         $consLocal{'CXXFLAGS'} .= " -g";
         $consLocal{'CXXFLAGS'} .= " -DNS_DEBUG -DDEBUG "; # for debugging
     } else {
-	$consLocal{'CXXFLAGS'} .= " -g";
+        $consLocal{'CXXFLAGS'} .= " -g";
         #$consLocal{'CXXFLAGS'} .= " -Os ";
     }
 
@@ -270,31 +270,31 @@ elsif ($platform eq "darwin") {
 
     # Make ".mm" file wrappers - so C/C++ code gets treated as objective-C.
     $cons->Command("plugin.mm", "plugin.cxx",
-		   (qq($unsiloedPythonExe util/objective_c_wrap.py %1 %0)));
+                   (qq($unsiloedPythonExe util/objective_c_wrap.py %1 %0)));
     $cons->Command("nsSciMoz.mm", "nsSciMoz.cxx",
-		   (qq($unsiloedPythonExe util/objective_c_wrap.py %1 %0)));
+                   (qq($unsiloedPythonExe util/objective_c_wrap.py %1 %0)));
     $cons->Command("sendscintilla.mm", "sendscintilla.cxx",
-		   (qq($unsiloedPythonExe util/objective_c_wrap.py %1 %0)));
+                   (qq($unsiloedPythonExe util/objective_c_wrap.py %1 %0)));
 
     $consLocal->Program(
-	$pluginName,
-	"plugin.mm",
+        $pluginName,
+        "plugin.mm",
         "npn_gate.cpp",
-	"nsSciMoz.mm",
-	"nsSciMozCocoa.mm",
-	"sendscintilla.mm",
+        "nsSciMoz.mm",
+        "nsSciMozCocoa.mm",
+        "sendscintilla.mm",
         "SciMozEvents.cxx",
-	);
+    );
 
     # here we build the bundle package
     # we also manually install since installRecursive likes to mess on up this.
     $cons->Command("$pluginDir/Contents/MacOS/SciMoz",
-		"SciMoz.r",
-		"Info.plist",
-		"English.lproj/InfoPlist.strings",
-		"./SciMoz",
-		(
-		 qq(
+                   "SciMoz.r",
+                   "Info.plist",
+                   "English.lproj/InfoPlist.strings",
+                   "./SciMoz",
+                   (
+                    qq(
 $unsiloedPythonExe bin/run-in-dir.py %1:d rm -Rf SciMoz.plugin
 $unsiloedPythonExe bin/run-in-dir.py %1:d mkdir -p SciMoz.plugin
 $unsiloedPythonExe bin/run-in-dir.py %1:d mkdir -p SciMoz.plugin/Contents
@@ -310,7 +310,7 @@ $unsiloedPythonExe bin/run-in-dir.py %1:d mkdir -p $mozPluginsDir
 $unsiloedPythonExe bin/run-in-dir.py %1:d cp -R SciMoz.plugin $mozPluginsDir/$pluginDir
 chmod a+rX $mozPluginsDir/$pluginDir
                    )
-		));
+    ));
 
 } 
 else {
@@ -351,8 +351,8 @@ else {
     $consLocal{'CXXFLAGS'} .= " -DXP_UNIX=1";
 
     if ($platform eq "solaris") {
-	# big-endian byte order indicator to license code
-	$consLocal{'CXXFLAGS'} .= " -DBYTEORDER=0x4321";
+        # big-endian byte order indicator to license code
+        $consLocal{'CXXFLAGS'} .= " -DBYTEORDER=0x4321";
         # Solaris ships with broken X11 headers that do not specify int
         # return types.  The -fpermissive flag converts the errors g++
         # would otherwise generate into warnings.
@@ -392,7 +392,7 @@ else {
 
 
 
-if ($withTests && $platform ne "win") {
+if ($withTests) {
     #
     # Headless SciMoz.
     #
@@ -408,33 +408,53 @@ if ($withTests && $platform ne "win") {
 
     my $headlessLibName = "headlessscintilla.a";
     my $dll_ext = "so";
+    my $dll_prefix = "lib";
     my $c_ext = "cxx";
+    my $o_ext = "o";
+    my $include_prefix = "-I";
+    my $define_prefix = "-D";
     if ($platform eq "darwin") {
-	$dll_ext = "dylib";
+        $dll_ext = "dylib";
         $c_ext = "mm";
+    } elsif ($platform eq "win") {
+        $dll_ext = "dll";
+        $dll_prefix = "";
+        $o_ext = "obj";
+        $include_prefix = "/I";
+        $define_prefix = "/D";
+        $headlessLibName = "ScintillaHeadless.dll";
     }
 
-    my $headlessSciMoz = "headless/libkoScimozHeadless.$dll_ext";
+    my $headlessSciMoz = "headless/${dll_prefix}koScimozHeadless.$dll_ext";
     my %consHeadless = $consLocal->copy();
     my $scintillaRealDir = substr $scintillaBuildDir, 1;  # starts with special cons "#" marker otherwise
 
-    $consHeadless{'CXXFLAGS'} = "-I$scintillaRealDir/headless -I$scintillaRealDir/src " . $consHeadless{'CXXFLAGS'};
-    $consHeadless{'CXXFLAGS'} .= " -DHEADLESS_SCIMOZ";
-    $consHeadless{'CXXFLAGS'} .= " -I$scintillaRealDir/../SciMoz";
+    $consHeadless{'CXXFLAGS'} = "${include_prefix}$scintillaRealDir/headless ${include_prefix}$scintillaRealDir/src " . $consHeadless{'CXXFLAGS'};
+    $consHeadless{'CXXFLAGS'} .= " ${define_prefix}HEADLESS_SCIMOZ";
+    $consHeadless{'CXXFLAGS'} .= " ${include_prefix}$scintillaRealDir/../SciMoz";
+
+    if ($platform eq "win") {
+        # Windows tweaks.
+        $LDFLAGS .= " /libpath:$xScintillaBuildDir/bin";
+        $LDFLAGS .= " /dll scintillaheadless.lib";
+        $consHeadless{'LDFLAGS'} = $LDFLAGS;
+        #$consHeadless{'CXXFLAGS'} .= " /DUSE_SCIN_DIRECT";
+        $consLocal->Install("$mozBin", "$scintillaBuildDir/bin/$headlessLibName");
+    }
 
     if ($platform eq "linux") {
-	# Linux tweaks.
-	$consHeadless{'LIBS'} =~ s/scintilla\.a/headlessscintilla.a/;
-	# Ensure to hide symbol names by default.
-	$consHeadless{'CXXFLAGS'} .= " -fvisibility=hidden";
+        # Linux tweaks.
+        $consHeadless{'LIBS'} =~ s/scintilla\.a/headlessscintilla.a/;
+        # Ensure to hide symbol names by default.
+        $consHeadless{'CXXFLAGS'} .= " -fvisibility=hidden";
     }
 
     if ($platform eq "darwin") {
-	# Mac tweaks
-	$consHeadless{'LIBS'} .= " $xScintillaBuildDir/bin/headlessscintilla.a";
-	$consHeadless{'LIBS'} .= " $xScintillaBuildDir/cocoa/libpcre.a";
-	# Ensure to hide symbol names by default.
-	$consHeadless{'CXXFLAGS'} .= " -fvisibility=hidden";
+        # Mac tweaks
+        $consHeadless{'LIBS'} .= " $xScintillaBuildDir/bin/headlessscintilla.a";
+        $consHeadless{'LIBS'} .= " $xScintillaBuildDir/cocoa/libpcre.a";
+        # Ensure to hide symbol names by default.
+        $consHeadless{'CXXFLAGS'} .= " -fvisibility=hidden";
     }
 
     $consHeadless = new cons(%consHeadless);
@@ -446,13 +466,13 @@ if ($withTests && $platform ne "win") {
     $consHeadless->Preprocess("sendscintilla.cxx", "headless/sendscintilla.$c_ext");
 
     $consHeadless->Program($headlessSciMoz,
-	# nsSciMoz.cxx needs to be after nsSciMozHeadless.cxx because GNU
-	# ld doesn't search for symbols in previous archives;
-	# see bug 95927 comment 12
-	"headless/nsSciMozHeadless.$c_ext",
-	"headless/nsSciMoz.cxx",
-	"headless/SciMozEvents.cxx",
-	"headless/sendscintilla.$c_ext",
+        # nsSciMoz.cxx needs to be after nsSciMozHeadless.cxx because GNU
+        # ld doesn't search for symbols in previous archives;
+        # see bug 95927 comment 12
+        "headless/nsSciMozHeadless.$c_ext",
+        "headless/nsSciMoz.cxx",
+        "headless/SciMozEvents.cxx",
+        "headless/sendscintilla.$c_ext",
     );
     $consHeadless->Depends($headlessSciMoz, "sendscintilla.h");
     $consHeadless->Depends($headlessSciMoz, "nsSciMoz.h");

@@ -67,7 +67,6 @@
                 });
                 break;
             case 'autoupdate-notification':
-                // TODO: Verify this code.
                 window.setTimeout(function()
                 {
                     try
@@ -103,9 +102,10 @@
             }
         }
 
-        notify.send(data.title, "autoUpdate",
+        notify.send(data.title + " - " + data.message, "autoUpdate",
         {
-            command: command
+            command: command,
+            priority: "warning"
         });
     }
 

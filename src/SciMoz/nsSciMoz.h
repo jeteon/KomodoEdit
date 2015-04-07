@@ -212,6 +212,21 @@ typedef struct _PlatformInstance {
 #endif
 }
 PlatformInstance;
+
+/**
+ * Helper class to be used as timer target (NSTimer).
+ */
+@interface SciMozVisibilityTimer: NSObject
+{
+  void* mTimer;
+  void* mTarget;
+}
+- (id) init: (void*) target;
+- (void) startTimer;
+- (void) stopTimer;
+- (void) timerFired: (NSTimer*) timer;
+@end
+
 #endif
 
 #endif  // else not HEADLESS_SCIMOZ
@@ -231,7 +246,9 @@ private:
     int16_t _textId;
     // Last line count gets updated whenever the text is changed.
     long mLastLineCount;
-    
+    // Setting for plugin visibility on Cocoa platform.
+    bool mPluginVisibilityHack;
+
     void DefaultSettings();
 
     // brace match support
@@ -327,6 +344,13 @@ public:
     // Notify that scimoz was closed.
     void PlatformMarkClosed(void);
 
+#ifdef XP_MACOSX
+#ifndef HEADLESS_SCIMOZ
+    SciMozVisibilityTimer *visibilityTimer;
+    void VisibilityTimerCallback(NSTimer *timer);
+#endif
+#endif
+
 #ifdef XP_MACOSX_USE_CORE_ANIMATION
     void *GetCoreAnimationLayer();
 #endif
@@ -361,6 +385,7 @@ public:
 
     NPRUNTIME_CUSTOM_METHOD(UpdateMarginWidths);
     NPRUNTIME_CUSTOM_METHOD(DoBraceMatch);
+    NPRUNTIME_CUSTOM_METHOD(EnablePluginVisibilityHack);
     NPRUNTIME_CUSTOM_METHOD(MarkClosed);
     NPRUNTIME_CUSTOM_METHOD(HookEvents);
     NPRUNTIME_CUSTOM_METHOD(UnhookEvents);

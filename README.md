@@ -36,11 +36,11 @@ Github: <https://github.com/Komodo/KomodoEdit>
 
 Forums: <http://forum.komodoide.com/>
 
-Bug Tracker: <http://bugs.activestate.com/enter_bug.cgi?product=Komodo>
+Bug Tracker: <https://github.com/Komodo/KomodoEdit/issues>
 
 IRC: <irc://irc.mozilla.org/#komodo>
 
-Mailing Lists: [komodo-discuss](http://code.activestate.com/lists/komodo-discuss/) & [komodo-beta](http://code.activestate.com/lists/komodo-beta/)
+Mailing Lists: [komodo-discuss](http://code.activestate.com/lists/komodo-discuss/) & [komodo-beta](http://code.activestate.com/lists/komodo-beta/) & [komodo-announce](http://code.activestate.com/lists/komodo-announce/)
 
 ## Building Komodo
 
@@ -237,3 +237,15 @@ with us.
 Note that if building complications arise after you updated your repo with the latest
 changes you might need to clear your local cache as it might be conflicting with the
 new changes, to do this run `bk distclean` before running your build steps.
+
+#### Pro-Tips
+
+**Build a single piece**
+
+Sometimes ```bk build``` is too much and ```bk build quick``` isn't enough.  If ```bk build quick``` doesn't appear to pickup your changes, try pointing ```bk``` at the piece in question.
+
+**Example**
+
+```bk build build/release/modules/places #this will build the places module only```
+
+---

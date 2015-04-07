@@ -1557,6 +1557,7 @@
             return;
           }
           let elem = null;
+          if ( !  this.selectedPanel) return;
           for (let child of this.selectedPanel.childNodes) {
             if ((child instanceof Element) && child.localName == "splitter") {
               elem = document.createElement("splitter");
@@ -1769,9 +1770,6 @@
           return observer;
         }).call(this)
       ]]>
-      </field>
-
-      <field name="_notification">
       </field>
 
       <property name="label">
@@ -2076,8 +2074,6 @@
                         " status: " + JSON.stringify(status) +
                         " attrib: " + this.getAttribute("ko-pane-drag-status"));
         this.setAttribute("ko-pane-drag-status", status ? "dragover" : "waiting");
-        this._notification.summary = status;
-        require("notify/notify").send(status, "customization");
         // Need to preventDefault, otherwise we always get a no-drop
         event.preventDefault();
         this._log.debug("<<< drag over " + this.id +
@@ -2122,7 +2118,6 @@
           }
         }
         this.setAttribute("ko-pane-drag-status", "waiting");
-        ko.notifications.remove(this._notification);
         this._log.debug("<<< drag leave " + this.id +
                         ": dropEffect = " +
                         event.dataTransfer.dropEffect +
@@ -2187,7 +2182,6 @@
           window.focus();
         }
         this.removeAttribute("ko-pane-drag-status");
-        ko.notifications.remove(this._notification);
       ]]>
       </handler>
       <handler event="dragend" phase="bubbling">
@@ -2195,7 +2189,6 @@
         if (!this.customizing) {
           return;
         }
-        ko.notifications.remove(this._notification);
         for (let id of ko.widgets.panes) {
           ko.widgets.getPaneAt(id).removeAttribute("ko-pane-drag-status");
         }
